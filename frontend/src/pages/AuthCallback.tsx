@@ -7,31 +7,34 @@ const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        // Get the session from the URL hash/fragment
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          navigate('/login?error=authentication_failed');
-          return;
-        }
-
-        if (session) {
-          // Session is automatically handled by AuthContext via onAuthStateChange
-          // Just redirect to home
-          navigate('/');
-        } else {
-          navigate('/login?error=no_session');
-        }
-      } catch (err) {
-        console.error('Callback error:', err);
-        navigate('/login?error=callback_failed');
+    // Listen for auth state change — this fires automatically when
+    // Supabase processes the OAuth tokens from the URL hash/fragment
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Successfully signed in — go to home
+        subscription.unsubscribe();
+        navigate('/', { replace: true });
+      } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        subscription.unsubscribe();
+        navigate('/login?error=no_session', { replace: true });
       }
-    };
+    });
 
-    handleCallback();
+    // Fallback: if onAuthStateChange doesn't fire within 5 seconds, check manually
+    const timeout = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      subscription.unsubscribe();
+      if (session) {
+        navigate('/', { replace: true });
+      } else {
+        navigate('/login?error=no_session', { replace: true });
+      }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [navigate]);
 
   return (
@@ -45,4 +48,3 @@ const AuthCallback = () => {
 };
 
 export default AuthCallback;
-

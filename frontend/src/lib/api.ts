@@ -1,5 +1,5 @@
 // API Client Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Get auth token from localStorage (set by auth context)
 const getAuthToken = (): string | null => {
@@ -17,7 +17,7 @@ const apiFetch = async (
   options: RequestInit = {}
 ): Promise<Response> => {
   const token = getAuthToken();
-  
+
   if (!token) {
     throw new Error('No authentication token found');
   }

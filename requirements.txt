@@ -26,9 +26,9 @@ greenlet==3.1.1
 # Redis
 redis==5.2.1
 
-# Hugging Face
+# Hugging Face — tokenizers 0.21.4+ supports huggingface_hub>=1.0
 huggingface_hub==1.5.0
-tokenizers==0.21.0
+tokenizers==0.21.4
 
 # ML
 scikit-learn==1.6.1

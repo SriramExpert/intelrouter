@@ -17,7 +17,7 @@ _streaming_executor = ThreadPoolExecutor(max_workers=4)
 
 def _stream_sync(model_name: str, query: str):
     """Synchronous generator that yields text chunks from HF streaming API."""
-    client = InferenceClient(api_key=settings.huggingface_api_key)
+    client = InferenceClient(api_key=settings.huggingface_api_key, provider="auto")
     stream = client.chat.completions.create(
         model=model_name,
         messages=[{"role": "user", "content": query}],

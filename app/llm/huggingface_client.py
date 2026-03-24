@@ -19,11 +19,11 @@ _executor: Optional[ThreadPoolExecutor] = None
 
 
 def get_client() -> InferenceClient:
-    """Create or return a singleton Hugging Face InferenceClient."""
     global _client
     if _client is None:
         _client = InferenceClient(
-            api_key=settings.huggingface_api_key
+            api_key=settings.huggingface_api_key,
+            provider="auto",  # uses router.huggingface.co automatically
         )
     return _client
 

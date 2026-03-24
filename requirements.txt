@@ -26,10 +26,9 @@ greenlet==3.1.1
 # Redis
 redis==5.2.1
 
-
 # Hugging Face
-huggingface_hub==1.5.0
-tokenizers==0.21.1
+huggingface_hub==0.26.5
+tokenizers==0.21.0
 transformers==4.49.0
 
 # ML
@@ -37,6 +36,7 @@ scikit-learn==1.6.1
 numpy==1.26.4
 scipy==1.15.2
 joblib==1.4.2
+
 # NLP
 nltk==3.9.1
 

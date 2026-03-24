@@ -9,21 +9,14 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Supabase OAuth returns tokens in the URL hash fragment:
-        // /auth/callback#access_token=...&refresh_token=...
-        // We must explicitly call exchangeCodeForSession or setSession
-        // to process the hash — onAuthStateChange alone is not reliable here.
-
         const hash = window.location.hash;
 
         if (hash && hash.includes('access_token')) {
-          // Parse the hash fragment into key-value pairs
-          const params = new URLSearchParams(hash.substring(1)); // strip leading '#'
+          const params = new URLSearchParams(hash.substring(1));
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
 
           if (accessToken && refreshToken) {
-            // Manually set the session using the tokens from the hash
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
@@ -36,7 +29,6 @@ const AuthCallback = () => {
             }
 
             if (data.session) {
-              // Clear the hash from the URL for security
               window.history.replaceState(null, '', window.location.pathname);
               navigate('/', { replace: true });
               return;
@@ -44,8 +36,7 @@ const AuthCallback = () => {
           }
         }
 
-        // Fallback: check if there's already an active session
-        // (e.g. user lands here after a page refresh)
+        // Fallback: already has a session (e.g. page refresh)
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           navigate('/', { replace: true });

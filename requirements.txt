@@ -35,7 +35,7 @@ scikit-learn==1.6.1
 numpy==1.26.4
 scipy==1.15.2
 joblib==1.4.2
-
+transformers==4.47.1
 # NLP
 nltk==3.9.1
 

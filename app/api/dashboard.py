@@ -2,7 +2,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.schemas import UserInfo, UsageToday, OverrideStatus, FeedbackRequest, FeedbackResponse
 from app.auth.jwt import verify_jwt
-from app.db.operations import get_user, get_user_usage_today, get_user_queries, save_ml_data
+from app.db.operations import get_user, get_user_usage_today, get_user_queries, save_ml_data, create_user
 from app.utils.redis_client import get_daily_token_usage, get_override_count
 from app.config import settings
 from app.utils.logger import get_logger
@@ -13,21 +13,37 @@ router = APIRouter(prefix="/api", tags=["dashboard"])
 
 @router.get("/me", response_model=UserInfo)
 async def get_me(user_info: dict = Depends(verify_jwt)):
-    """Get current user info."""
+    """Get current user info — auto-creates user on first login (supports Google OAuth)."""
     start_time = time.time()
     user_id = user_info["user_id"]
-    
+    email = user_info["email"]
+    role = user_info.get("role", "user")
+
     logger.info(f"👤 GET_USER_INFO | User: {user_id[:8]}...")
-    
+
     try:
         user = get_user(user_id)
+
         if not user:
-            logger.warning(f"   ⚠️  User not found: {user_id[:8]}...")
+            # Auto-create user on first login (Google OAuth / email signups)
+            logger.info(f"   ➕ New user detected, auto-creating: {email} | Role: {role}")
+            try:
+                create_user(user_id, email, role)
+                logger.info(f"   ✅ User created successfully: {email}")
+            except Exception as create_err:
+                logger.error(f"   ❌ Failed to create user: {type(create_err).__name__}: {str(create_err)}")
+                raise HTTPException(status_code=500, detail=f"Failed to create user: {str(create_err)}")
+
+            # Fetch again after creation
+            user = get_user(user_id)
+
+        if not user:
+            logger.warning(f"   ⚠️  User still not found after creation attempt: {user_id[:8]}...")
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         duration = time.time() - start_time
         logger.info(f"   ✅ User info retrieved | Email: {user.email} | Role: {user.role} | Duration: {duration:.3f}s")
-        
+
         return UserInfo(
             id=user.id,
             email=user.email,
@@ -46,23 +62,23 @@ async def get_usage_today(user_info: dict = Depends(verify_jwt)):
     """Get today's usage statistics."""
     start_time = time.time()
     user_id = user_info["user_id"]
-    
+
     logger.info(f"📊 GET_USAGE_TODAY | User: {user_id[:8]}...")
-    
+
     try:
         logger.debug(f"   📈 Fetching usage from database...")
         usage = get_user_usage_today(user_id)
         logger.debug(f"   💰 Fetching current usage from Redis...")
         current_usage = get_daily_token_usage(user_id)
         remaining = max(0, settings.daily_token_limit - current_usage)
-        
+
         duration = time.time() - start_time
         logger.info(
             f"   ✅ Usage retrieved | Tokens: {usage['total_tokens']:,} | "
             f"Cost: ${usage['total_cost']:.4f} | Requests: {usage['request_count']} | "
             f"Remaining: {remaining:,} | Duration: {duration:.3f}s"
         )
-        
+
         return UsageToday(
             total_tokens=usage["total_tokens"],
             total_cost=usage["total_cost"],
@@ -80,16 +96,16 @@ async def get_query_history(user_info: dict = Depends(verify_jwt)):
     """Get user's query history."""
     start_time = time.time()
     user_id = user_info["user_id"]
-    
+
     logger.info(f"📜 GET_QUERY_HISTORY | User: {user_id[:8]}...")
-    
+
     try:
         logger.debug(f"   🔍 Fetching query history from database...")
         queries = get_user_queries(user_id)
-        
+
         duration = time.time() - start_time
         logger.info(f"   ✅ Retrieved {len(queries)} queries | Duration: {duration:.3f}s")
-        
+
         return [
             {
                 "id": q.id,
@@ -112,17 +128,17 @@ async def get_override_status(user_info: dict = Depends(verify_jwt)):
     """Get remaining override count."""
     start_time = time.time()
     user_id = user_info["user_id"]
-    
+
     logger.info(f"🔒 GET_OVERRIDE_STATUS | User: {user_id[:8]}...")
-    
+
     try:
         logger.debug(f"   📊 Fetching override count from Redis...")
         used = get_override_count(user_id)
         remaining = max(0, 3 - used)
-        
+
         duration = time.time() - start_time
         logger.info(f"   ✅ Override status | Used: {used}/3 | Remaining: {remaining} | Duration: {duration:.3f}s")
-        
+
         return OverrideStatus(
             remaining=remaining,
             used=used,
@@ -142,16 +158,14 @@ async def submit_feedback(
     """Submit routing feedback for ML training."""
     start_time = time.time()
     user_id = user_info["user_id"]
-    
+
     logger.info(f"📝 SUBMIT_FEEDBACK | User: {user_id[:8]}... | Correct: {feedback.is_correct}")
-    
+
     try:
         if feedback.is_correct:
-            # User says routing is correct - use the current difficulty
             difficulty = feedback.difficulty.upper()
             logger.info(f"   ✅ Routing confirmed correct | Difficulty: {difficulty}")
         else:
-            # User says routing is wrong - use the corrected difficulty
             if not feedback.correct_difficulty:
                 raise HTTPException(
                     status_code=400,
@@ -162,20 +176,18 @@ async def submit_feedback(
                 f"   ⚠️  Routing corrected | Original: {feedback.difficulty} | "
                 f"Correct: {difficulty}"
             )
-        
-        # Validate difficulty
+
         if difficulty not in ["EASY", "MEDIUM", "HARD"]:
             raise HTTPException(
                 status_code=400,
                 detail="Difficulty must be EASY, MEDIUM, or HARD"
             )
-        
-        # Save to ML data table
+
         save_ml_data(feedback.query, difficulty)
-        
+
         duration = time.time() - start_time
         logger.info(f"   ✅ Feedback saved | Duration: {duration:.3f}s")
-        
+
         return FeedbackResponse(
             success=True,
             message="Feedback saved successfully"

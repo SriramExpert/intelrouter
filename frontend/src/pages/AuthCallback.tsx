@@ -7,34 +7,59 @@ const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for auth state change — this fires automatically when
-    // Supabase processes the OAuth tokens from the URL hash/fragment
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        // Successfully signed in — go to home
-        subscription.unsubscribe();
-        navigate('/', { replace: true });
-      } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
-        subscription.unsubscribe();
-        navigate('/login?error=no_session', { replace: true });
-      }
-    });
+    const handleCallback = async () => {
+      try {
+        // Supabase OAuth returns tokens in the URL hash fragment:
+        // /auth/callback#access_token=...&refresh_token=...
+        // We must explicitly call exchangeCodeForSession or setSession
+        // to process the hash — onAuthStateChange alone is not reliable here.
 
-    // Fallback: if onAuthStateChange doesn't fire within 5 seconds, check manually
-    const timeout = setTimeout(async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      subscription.unsubscribe();
-      if (session) {
-        navigate('/', { replace: true });
-      } else {
-        navigate('/login?error=no_session', { replace: true });
-      }
-    }, 5000);
+        const hash = window.location.hash;
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
+        if (hash && hash.includes('access_token')) {
+          // Parse the hash fragment into key-value pairs
+          const params = new URLSearchParams(hash.substring(1)); // strip leading '#'
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            // Manually set the session using the tokens from the hash
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (error) {
+              console.error('Error setting session:', error.message);
+              navigate('/login?error=session_error', { replace: true });
+              return;
+            }
+
+            if (data.session) {
+              // Clear the hash from the URL for security
+              window.history.replaceState(null, '', window.location.pathname);
+              navigate('/', { replace: true });
+              return;
+            }
+          }
+        }
+
+        // Fallback: check if there's already an active session
+        // (e.g. user lands here after a page refresh)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          navigate('/', { replace: true });
+        } else {
+          navigate('/login?error=no_session', { replace: true });
+        }
+
+      } catch (err) {
+        console.error('Auth callback error:', err);
+        navigate('/login?error=unexpected', { replace: true });
+      }
     };
+
+    handleCallback();
   }, [navigate]);
 
   return (

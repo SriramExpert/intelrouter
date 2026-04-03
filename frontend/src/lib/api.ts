@@ -1,5 +1,5 @@
 // API Client Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://intelrouter-backend-5w1u.onrender.com';
 
 // Get auth token from localStorage (set by auth context)
 const getAuthToken = (): string | null => {

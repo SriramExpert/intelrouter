@@ -34,10 +34,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(session?.user ?? null);
       if (session?.access_token) {
         localStorage.setItem('auth_token', session.access_token);
-        // Fetch user info from API
-        fetchUserInfo();
+        fetchUserInfo().finally(() => setLoading(false)); // ← wait for userInfo
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Listen for auth changes
@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.access_token) {
         localStorage.setItem('auth_token', session.access_token);
         await fetchUserInfo();

@@ -70,14 +70,14 @@ async def log_requests(request: Request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:8080",  # Frontend dev server
-        "https://intelrouter-frontend.onrender.com",
-        "https://intelrouter.onrender.com",
-        "http://localhost:8081",  # Alternative frontend port
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:8081",
-        # Add production frontend URL here when deployed
-    ],
+    "https://intelrouter.onrender.com",           # ✅ keep this
+    "http://localhost:5173",                        # add if using Vite
+    "http://localhost:3000",                        # add if using React CRA
+    "http://localhost:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
